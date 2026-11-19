@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CardioSense · Heart Disease Risk Assessment</title>
-<!-- Chart.js for real-time graphs -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root {
@@ -31,7 +30,7 @@
     padding: 28px 18px 80px;
     line-height: 1.5;
   }
-  .wrap { max-width: 1240px; margin: 0 auto; }
+  .wrap { max-width: 1400px; margin: 0 auto; }
 
   header {
     display: flex; align-items: center; justify-content: space-between;
@@ -55,7 +54,7 @@
   .dot.online { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
 
   .layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; align-items: start; }
-  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
 
   .section-title {
     font-size: 12px; text-transform: uppercase; letter-spacing: 1.4px;
@@ -63,7 +62,7 @@
   }
 
   /* Vitals Cards */
-  .vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
   .card {
     background: linear-gradient(160deg, var(--surface), var(--surface2));
     border: 1px solid var(--border); border-radius: var(--radius);
@@ -81,7 +80,7 @@
     font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px;
     color: var(--muted); margin-bottom: 7px; font-weight: 600;
   }
-  .card .value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .card .value { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
   .card .value small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 3px; }
   .card .sub { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
   .pill {
@@ -91,10 +90,6 @@
   .pill.ok { background: rgba(34,197,94,0.15); color: #4ade80; }
   .pill.warn { background: rgba(245,158,11,0.15); color: #fbbf24; }
   .pill.bad { background: rgba(239,68,68,0.15); color: #f87171; }
-  .mini-row { display: flex; gap: 8px; margin-top: 4px; }
-  .mini { flex: 1; background: var(--surface2); border-radius: 9px; padding: 7px 9px; }
-  .mini .k { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
-  .mini .v { font-size: 15px; font-weight: 600; }
 
   /* Graphs */
   .graphs { display: grid; grid-template-columns: 1fr; gap: 20px; }
@@ -103,7 +98,23 @@
     border-radius: var(--radius); padding: 16px;
   }
   .graph-box h3 { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-  .canvas-wrap { position: relative; height: 180px; width: 100%; }
+  .canvas-wrap { position: relative; height: 160px; width: 100%; }
+
+  /* Table */
+  .table-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-top: 24px; overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left; }
+  th { padding: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
+  td { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .btn-download {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 12px; border-radius: 6px;
+    cursor: pointer; font-size: 11px; font-weight: 600; transition: 0.2s;
+  }
+  .btn-download:hover { background: var(--accent); border-color: var(--accent); color: white; }
 
   /* Risk Panel */
   .risk-panel {
@@ -115,13 +126,13 @@
   .risk-header h2 { font-size: 15px; font-weight: 600; }
   .risk-header span { font-size: 11px; color: var(--muted); }
 
-  .gauge { display: grid; place-items: center; margin: 14px 0 6px; }
+  .gauge { display: grid; place-items: center; margin: 10px 0 6px; }
   .gauge svg { transform: rotate(-90deg); }
   .gauge .ring-bg { stroke: #1c2740; }
   .gauge .ring-fg { stroke: url(#riskGrad); stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1); }
   .gauge-center { position: absolute; text-align: center; }
   .gauge-wrap { position: relative; display: grid; place-items: center; }
-  .risk-num { font-size: 38px; font-weight: 800; letter-spacing: -1px; }
+  .risk-num { font-size: 36px; font-weight: 800; letter-spacing: -1px; }
   .risk-num small { font-size: 16px; font-weight: 600; color: var(--muted); }
   .risk-class { font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 2px; }
 
@@ -142,28 +153,21 @@
   .field input:focus, .field select:focus { border-color: var(--accent); }
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 
-  .btn {
-    width: 100%; padding: 11px; border: none; border-radius: 10px;
+  .btn-main {
+    width: 100%; padding: 12px; border: none; border-radius: 10px;
     background: linear-gradient(135deg, var(--accent), #8b5cf6);
     color: white; font-size: 13.5px; font-weight: 700; letter-spacing: 0.3px;
     cursor: pointer; transition: transform 0.15s, box-shadow 0.2s;
-    margin-top: 6px;
+    margin-top: 10px;
   }
-  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(79,142,247,0.4); }
-  .btn:active { transform: translateY(0); }
-
-  .model-info {
-    margin-top: 14px; padding: 11px 13px; background: var(--surface2);
-    border-radius: 10px; font-size: 11px; color: var(--muted); line-height: 1.6;
-  }
-  .model-info b { color: var(--accent2); }
+  .btn-main:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(79,142,247,0.4); }
+  .btn-main:active { transform: translateY(0); }
 
   .recs { margin-top: 14px; }
   .recs .rec {
     display: flex; gap: 9px; padding: 9px 11px; background: var(--surface2);
     border-radius: 9px; margin-bottom: 7px; font-size: 11.5px; align-items: flex-start;
   }
-  .recs .rec .ico { font-size: 14px; line-height: 1.2; }
 
   .err {
     margin-bottom: 16px; padding: 12px 16px; border-radius: 10px;
@@ -171,8 +175,8 @@
     color: #fca5a5; font-size: 12.5px; display: none;
   }
 
-  footer { max-width: 1240px; margin: 40px auto 0; font-size: 11px; color: var(--muted); text-align: center; line-height: 1.7; }
-  .disclaimer { max-width: 1240px; margin: 20px auto 0; padding: 12px 16px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; font-size: 11px; color: #d4b06a; }
+  .disclaimer { margin: 30px 0 0; padding: 12px 16px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; font-size: 11px; color: #d4b06a; text-align: center; }
+  footer { margin: 20px 0 0; font-size: 11px; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
@@ -217,7 +221,7 @@
         </div>
         <div class="card" id="cFsr">
           <div class="label">Pressure (FSR)</div>
-          <div class="value" id="vFsr">--<small>g</small></div>
+          <div class="value" id="vFsr">--</div>
           <div class="sub" id="sFsr">raw: --</div>
         </div>
         <div class="card" id="cFinger">
@@ -279,6 +283,12 @@
 
       <div class="form">
         <h3>Patient Parameters</h3>
+        
+        <div class="field">
+          <label>Patient Name</label>
+          <input type="text" id="fName" placeholder="Enter full name" />
+        </div>
+
         <div class="field-row">
           <div class="field">
             <label>Age</label>
@@ -328,16 +338,32 @@
           <label>ST Depression (oldpeak)</label>
           <input type="number" id="fOldpeak" value="1.0" step="0.1" min="0" max="6" />
         </div>
-        <button class="btn" id="calcBtn">Run Prediction</button>
-
-        <div class="model-info">
-          Model: <b>Logistic Regression</b> · Trained on UCI Cleveland heart disease data.
-          Accuracy ≈ <b>85%</b> on held-out data.
-        </div>
+        <button class="btn-main" id="calcBtn">Run Prediction</button>
 
         <div class="recs" id="recs"></div>
       </div>
     </aside>
+  </div>
+
+  <!-- HISTORY TABLE -->
+  <div class="table-container">
+    <div class="section-title" style="margin-bottom: 16px;">Patient Prediction History</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date & Time</th>
+          <th>Patient Name</th>
+          <th>Risk Score</th>
+          <th>Classification</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr>
+          <td colspan="5" style="text-align: center; color: var(--muted); padding: 20px;">No predictions run yet. Enter patient details and click Run Prediction.</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="disclaimer">
@@ -383,41 +409,17 @@ const tone = (id, t) => {
 };
 
 /* ---------- CHARTS SETUP ---------- */
-const MAX_POINTS = 60; // Show last 60 data points
-
+const MAX_POINTS = 60;
 function makeChart(ctx, label, color, yMin, yMax) {
   return new Chart(ctx, {
     type: 'line',
     data: {
       labels: Array(MAX_POINTS).fill(''),
-      datasets: [{
-        label: label,
-        data: Array(MAX_POINTS).fill(null),
-        borderColor: color,
-        backgroundColor: color + '20', // 12% opacity
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 0,
-        fill: true
-      }]
+      datasets: [{ label, data: Array(MAX_POINTS).fill(null), borderColor: color, backgroundColor: color + '20', borderWidth: 2, tension: 0.3, pointRadius: 0, fill: true }]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { display: false },
-        y: { 
-          min: yMin, max: yMax,
-          grid: { color: '#1e2a44' },
-          ticks: { color: '#7f8ca6', font: { size: 10 } }
-        }
-      }
-    }
+    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { min: yMin, max: yMax, grid: { color: '#1e2a44' }, ticks: { color: '#7f8ca6', font: { size: 10 } } } } }
   });
 }
-
 const ecgChart = makeChart($('ecgChart').getContext('2d'), 'ECG', '#22c55e', 0, 4095);
 const accelChart = makeChart($('accelChart').getContext('2d'), 'Accel', '#4f8ef7', -2, 2);
 const gyroChart = makeChart($('gyroChart').getContext('2d'), 'Gyro', '#8b5cf6', -250, 250);
@@ -429,10 +431,7 @@ function pushChartData(chart, val) {
 }
 
 /* ---------- LOGISTIC REGRESSION ---------- */
-const LR = {
-  intercept: -6.78,
-  weights: { age: 0.048, sex: 0.85, cp: -0.52, trestbps: 0.021, chol: 0.008, fbs: 0.31, thalach: -0.023, exang: 0.72, oldpeak: 0.48 }
-};
+const LR = { intercept: -6.78, weights: { age: 0.048, sex: 0.85, cp: -0.52, trestbps: 0.021, chol: 0.008, fbs: 0.31, thalach: -0.023, exang: 0.72, oldpeak: 0.48 } };
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
 function predictRisk(p) {
   let z = LR.intercept;
@@ -447,6 +446,9 @@ function predictRisk(p) {
   z += LR.weights.oldpeak  * p.oldpeak;
   return sigmoid(z);
 }
+
+let currentRisk = { prob: 0, cls: "", recs: [] };
+let latestVitals = { bpm: 0, spo2: 0, bodyTemp: 0, ecg: 0, fsr: 0, finger: 0, accelX: 0, accelY: 0, accelZ: 0, gyroX: 0, gyroY: 0, gyroZ: 0 };
 
 function renderRisk(prob) {
   const pct = Math.round(prob * 100);
@@ -468,9 +470,9 @@ function renderRisk(prob) {
   }
   $("riskClass").textContent = cls;
   $("riskClass").style.color = color;
-  $("recs").innerHTML = recs.map(([i, t]) =>
-    `<div class="rec"><span class="ico" style="color:${color}">${i}</span><span>${t}</span></div>`
-  ).join("");
+  $("recs").innerHTML = recs.map(([i, t]) => `<div class="rec"><span class="ico" style="color:${color}">${i}</span><span>${t}</span></div>`).join("");
+  
+  currentRisk = { prob, cls, recs };
 }
 
 /* ---------- LIVE DATA & INVERSE FSR ---------- */
@@ -481,31 +483,30 @@ onValue(dataRef, (snap) => {
   if (!d) return;
 
   const finger = Number(d.finger) === 1;
-  const leadOff = Number(d.leadOff) === 1;
+  const rawFsr = Number(d.fsrRaw) || 0;
+  const invertedForce = 4095 - rawFsr; 
 
-  // 1. Update Text
-  $("vBpm").innerHTML = fmt(d.bpm, 0, "bpm");
-  if (finger && d.bpm > 0) { $("sBpm").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBpm","ok"); }
+  latestVitals = {
+    bpm: Number(d.bpm) || 0, spo2: Number(d.spo2) || 0, bodyTemp: Number(d.bodyTemp) || 0,
+    ecg: Number(d.ecg) || 0, fsr: invertedForce, finger: finger,
+    accelX: Number(d.accelX)||0, accelY: Number(d.accelY)||0, accelZ: Number(d.accelZ)||0,
+    gyroX: Number(d.gyroX)||0, gyroY: Number(d.gyroY)||0, gyroZ: Number(d.gyroZ)||0
+  };
+
+  $("vBpm").innerHTML = fmt(latestVitals.bpm, 0, "bpm");
+  if (finger && latestVitals.bpm > 0) { $("sBpm").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBpm","ok"); }
   else { $("sBpm").textContent = finger ? "reading…" : "no finger"; tone("cBpm","warn"); }
 
-  $("vSpo2").innerHTML = fmt(d.spo2, 0, "%");
-  if (finger && d.spo2 >= 95) { $("sSpo2").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cSpo2","ok"); }
+  $("vSpo2").innerHTML = fmt(latestVitals.spo2, 0, "%");
+  if (finger && latestVitals.spo2 >= 95) { $("sSpo2").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cSpo2","ok"); }
   else if (finger) { $("sSpo2").innerHTML = `<span class="pill warn">LOW</span>`; tone("cSpo2","warn"); }
   else { $("sSpo2").textContent = "no finger"; tone("cSpo2","warn"); }
 
-  $("vBody").innerHTML = fmt(d.bodyTemp, 1, "°C");
-  if (d.bodyTemp >= 36.1 && d.bodyTemp <= 37.5) { $("sBody").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBody","ok"); }
-  else if (d.bodyTemp >= 39) { $("sBody").innerHTML = `<span class="pill bad">FEVER</span>`; tone("cBody","bad"); }
+  $("vBody").innerHTML = fmt(latestVitals.bodyTemp, 1, "°C");
+  if (latestVitals.bodyTemp >= 36.1 && latestVitals.bodyTemp <= 37.5) { $("sBody").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBody","ok"); }
+  else if (latestVitals.bodyTemp >= 39) { $("sBody").innerHTML = `<span class="pill bad">FEVER</span>`; tone("cBody","bad"); }
   else { $("sBody").textContent = "DS18B20"; tone("cBody", null); }
 
-  // INVERSE FSR LOGIC
-  // Assuming ESP32 sends raw ADC (0-4095). 
-  // When sensor is pressed, raw drops toward 0 (inverse pull-up logic).
-  // We will invert the value so 4095->0g, and 0->9999g (or use the inverted value directly).
-  const rawFsr = Number(d.fsrRaw) || 0;
-  const invertedForce = 4095 - rawFsr; 
-  
-  // Display the inverse reading
   $("vFsr").innerHTML = fmt(invertedForce, 0, "");
   $("sFsr").textContent = "inv raw: " + invertedForce;
   tone("cFsr", invertedForce > 0 ? "ok" : null);
@@ -513,31 +514,125 @@ onValue(dataRef, (snap) => {
   $("vFinger").innerHTML = finger ? `<span class="pill ok">DETECTED</span>` : `<span class="pill bad">NOT DETECTED</span>`;
   tone("cFinger", finger ? "ok" : "bad");
 
-  // 2. Update Graphs
   if (d.ecg !== undefined) pushChartData(ecgChart, Number(d.ecg));
   if (d.accelX !== undefined) pushChartData(accelChart, Number(d.accelX));
   if (d.gyroX !== undefined) pushChartData(gyroChart, Number(d.gyroX));
 
   $("lastUpdate").textContent = "updated " + new Date().toLocaleTimeString();
-
-  if (finger && d.bpm > 0) $("fHr").value = Math.min(220, Math.max(60, d.bpm));
+  if (finger && latestVitals.bpm > 0) $("fHr").value = Math.min(220, Math.max(60, latestVitals.bpm));
 }, (err) => {
   $("dot").classList.remove("online");
   $("statusText").textContent = "Firebase error";
-  const b = $("errBox"); b.style.display = "block";
-  b.textContent = "Firebase read error: " + err.message;
+  $("errBox").style.display = "block";
+  $("errBox").textContent = "Firebase read error: " + err.message;
 });
 
+/* ---------- RUN PREDICTION & SAVE TO TABLE ---------- */
+let predictionHistory = [];
+
 $("calcBtn").addEventListener("click", () => {
+  const name = $("fName").value.trim() || "Unknown Patient";
   const p = {
     age: Number($("fAge").value), sex: Number($("fSex").value), cp: Number($("fCp").value),
     bp: Number($("fBp").value), chol: Number($("fChol").value), fbs: Number($("fFbs").value),
     hr: Number($("fHr").value), exang: Number($("fExang").value), oldpeak: Number($("fOldpeak").value)
   };
-  renderRisk(predictRisk(p));
+  const prob = predictRisk(p);
+  renderRisk(prob);
+
+  // Save to history
+  const now = new Date();
+  const record = {
+    id: Date.now(),
+    dateStr: now.toLocaleDateString() + " " + now.toLocaleTimeString(),
+    name: name,
+    risk: Math.round(prob * 100) + "%",
+    cls: currentRisk.cls,
+    inputs: p,
+    vitals: latestVitals
+  };
+  predictionHistory.unshift(record);
+  updateTable();
 });
 
-$("calcBtn").click();
+function updateTable() {
+  const tbody = $("historyBody");
+  if (predictionHistory.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 20px;">No predictions run yet.</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = predictionHistory.map(row => {
+    let clsColor = row.cls.includes("LOW") ? "var(--ok)" : row.cls.includes("MODERATE") ? "var(--warn)" : "var(--bad)";
+    return `
+      <tr>
+        <td>${row.dateStr}</td>
+        <td><strong>${row.name}</strong></td>
+        <td>${row.risk}</td>
+        <td style="color: ${clsColor}; font-weight: 600;">${row.cls}</td>
+        <td><button class="btn-download" onclick="downloadReport(${row.id})">⬇ Download Report</button></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+/* ---------- DOWNLOAD REPORT FUNCTION ---------- */
+window.downloadReport = function(id) {
+  const data = predictionHistory.find(r => r.id === id);
+  if (!data) return;
+
+  const border = "========================================================\n";
+  let text = "";
+  text += border;
+  text += "               CARDIOSENSE MEDICAL REPORT               \n";
+  text += border;
+  text += `Date & Time : ${data.dateStr}\n`;
+  text += `Patient Name: ${data.name}\n`;
+  text += border + "\n";
+
+  text += "--- PREDICTION RESULTS ---\n";
+  text += `Risk Score  : ${data.risk}\n`;
+  text += `Classification: ${data.cls}\n`;
+  text += `Recommendation:\n`;
+  data.recs.forEach(r => { text += `  - ${r[1]}\n`; });
+  text += "\n";
+
+  text += "--- CLINICAL PARAMETERS (INPUT) ---\n";
+  text += `Age: ${data.inputs.age} yrs | Sex: ${data.inputs.sex === 1 ? 'Male' : 'Female'}\n`;
+  text += `Resting BP: ${data.inputs.bp} mmHg | Cholesterol: ${data.inputs.chol} mg/dL\n`;
+  text += `Max Heart Rate: ${data.inputs.hr} bpm | ST Depression: ${data.inputs.oldpeak}\n`;
+  text += `Chest Pain Type: ${['Typical Angina','Atypical Angina','Non-Anginal','Asymptomatic'][data.inputs.cp]}\n`;
+  text += `Fasting Blood Sugar > 120: ${data.inputs.fbs === 1 ? 'Yes' : 'No'}\n`;
+  text += `Exercise Angina: ${data.inputs.exang === 1 ? 'Yes' : 'No'}\n\n`;
+
+  text += "--- LIVE SENSOR VITALS (AT TIME OF TEST) ---\n";
+  text += `Heart Rate (MAX30100): ${data.vitals.bpm} bpm\n`;
+  text += `SpO2 (MAX30100)      : ${data.vitals.spo2} %\n`;
+  text += `Body Temp (DS18B20)  : ${data.vitals.bodyTemp} °C\n`;
+  text += `ECG Value (AD8232)   : ${data.vitals.ecg}\n`;
+  text += `Pressure (FSR)       : ${data.vitals.fsr} (inverted)\n\n`;
+
+  text += "--- MOTION DATA (MPU6050) ---\n";
+  text += `Accelerometer: X: ${data.vitals.accelX}g, Y: ${data.vitals.accelY}g, Z: ${data.vitals.accelZ}g\n`;
+  text += `Gyroscope    : X: ${data.vitals.gyroX}°/s, Y: ${data.vitals.gyroY}°/s, Z: ${data.vitals.gyroZ}°/s\n\n`;
+
+  text += border;
+  text += "DISCLAIMER: This tool is for educational and research purposes\n";
+  text += "only. It is not a medical device and must not be used for\n";
+  text += "clinical diagnosis. Always consult a qualified healthcare professional.\n";
+  text += border;
+
+  // Create download link
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Report_${data.name.replace(/\s+/g, '_')}_${data.dateStr.replace(/[\/\:]/g, '-')}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 </script>
 </body>
 </html>
