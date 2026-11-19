@@ -109,6 +109,7 @@
   th { padding: 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
   td { padding: 12px 10px; border-bottom: 1px solid var(--border); }
   tr:last-child td { border-bottom: none; }
+  
   .btn-download {
     background: var(--surface2); border: 1px solid var(--border);
     color: var(--text); padding: 6px 12px; border-radius: 6px;
@@ -199,8 +200,7 @@
   <div class="err" id="errBox"></div>
 
   <div class="layout">
-
-    <!-- LEFT: Vitals & Graphs -->
+    <!-- LEFT -->
     <div>
       <div class="section-title">Live Vitals</div>
       <div class="vitals">
@@ -248,7 +248,7 @@
       </div>
     </div>
 
-    <!-- RIGHT: Risk Panel -->
+    <!-- RIGHT -->
     <aside class="risk-panel">
       <div class="risk-header">
         <h2>10-Year Risk Prediction</h2>
@@ -345,7 +345,6 @@
     </aside>
   </div>
 
-  <!-- HISTORY TABLE -->
   <div class="table-container">
     <div class="section-title" style="margin-bottom: 16px;">Patient Prediction History</div>
     <table>
@@ -527,7 +526,7 @@ onValue(dataRef, (snap) => {
   $("errBox").textContent = "Firebase read error: " + err.message;
 });
 
-/* ---------- RUN PREDICTION & SAVE TO TABLE ---------- */
+/* ---------- RUN PREDICTION ---------- */
 let predictionHistory = [];
 
 $("calcBtn").addEventListener("click", () => {
@@ -540,7 +539,6 @@ $("calcBtn").addEventListener("click", () => {
   const prob = predictRisk(p);
   renderRisk(prob);
 
-  // Save to history
   const now = new Date();
   const record = {
     id: Date.now(),
@@ -548,6 +546,7 @@ $("calcBtn").addEventListener("click", () => {
     name: name,
     risk: Math.round(prob * 100) + "%",
     cls: currentRisk.cls,
+    recs: currentRisk.recs,
     inputs: p,
     vitals: latestVitals
   };
@@ -570,14 +569,22 @@ function updateTable() {
         <td><strong>${row.name}</strong></td>
         <td>${row.risk}</td>
         <td style="color: ${clsColor}; font-weight: 600;">${row.cls}</td>
-        <td><button class="btn-download" onclick="downloadReport(${row.id})">⬇ Download Report</button></td>
+        <td><button class="btn-download" data-id="${row.id}">⬇ Download Report</button></td>
       </tr>
     `;
   }).join("");
+
+  // Attach event listeners to newly created buttons
+  document.querySelectorAll('.btn-download').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = Number(e.target.getAttribute('data-id'));
+      downloadReport(id);
+    });
+  });
 }
 
 /* ---------- DOWNLOAD REPORT FUNCTION ---------- */
-window.downloadReport = function(id) {
+function downloadReport(id) {
   const data = predictionHistory.find(r => r.id === id);
   if (!data) return;
 
@@ -591,7 +598,7 @@ window.downloadReport = function(id) {
   text += border + "\n";
 
   text += "--- PREDICTION RESULTS ---\n";
-  text += `Risk Score  : ${data.risk}\n`;
+  text += `Risk Score    : ${data.risk}\n`;
   text += `Classification: ${data.cls}\n`;
   text += `Recommendation:\n`;
   data.recs.forEach(r => { text += `  - ${r[1]}\n`; });
@@ -622,7 +629,6 @@ window.downloadReport = function(id) {
   text += "clinical diagnosis. Always consult a qualified healthcare professional.\n";
   text += border;
 
-  // Create download link
   const blob = new Blob([text], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -632,7 +638,7 @@ window.downloadReport = function(id) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-};
+}
 </script>
 </body>
 </html>
