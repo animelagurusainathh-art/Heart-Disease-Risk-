@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CardioSense · Heart Disease Risk Assessment</title>
+<!-- Chart.js for real-time graphs -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root {
     --bg: #070b14;
@@ -60,7 +62,8 @@
     color: var(--muted); margin-bottom: 12px; font-weight: 600;
   }
 
-  .vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+  /* Vitals Cards */
+  .vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
   .card {
     background: linear-gradient(160deg, var(--surface), var(--surface2));
     border: 1px solid var(--border); border-radius: var(--radius);
@@ -93,6 +96,16 @@
   .mini .k { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
   .mini .v { font-size: 15px; font-weight: 600; }
 
+  /* Graphs */
+  .graphs { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .graph-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .graph-box h3 { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+  .canvas-wrap { position: relative; height: 180px; width: 100%; }
+
+  /* Risk Panel */
   .risk-panel {
     background: linear-gradient(170deg, #111a2e, #0b1322);
     border: 1px solid var(--border); border-radius: var(--radius);
@@ -183,8 +196,9 @@
 
   <div class="layout">
 
+    <!-- LEFT: Vitals & Graphs -->
     <div>
-      <div class="section-title">Live Vitals · Firebase</div>
+      <div class="section-title">Live Vitals</div>
       <div class="vitals">
         <div class="card" id="cBpm">
           <div class="label">Heart Rate</div>
@@ -201,11 +215,6 @@
           <div class="value" id="vBody">--<small>°C</small></div>
           <div class="sub" id="sBody">DS18B20</div>
         </div>
-        <div class="card" id="cEcg">
-          <div class="label">ECG</div>
-          <div class="value" id="vEcg">--</div>
-          <div class="sub" id="sEcg">electrodes…</div>
-        </div>
         <div class="card" id="cFsr">
           <div class="label">Pressure (FSR)</div>
           <div class="value" id="vFsr">--<small>g</small></div>
@@ -216,30 +225,26 @@
           <div class="value" id="vFinger" style="font-size:20px;">--</div>
           <div class="sub" id="sFinger">MAX30100</div>
         </div>
-        <div class="card">
-          <div class="label">Accelerometer (g)</div>
-          <div class="mini-row">
-            <div class="mini"><div class="k">X</div><div class="v" id="vAx">--</div></div>
-            <div class="mini"><div class="k">Y</div><div class="v" id="vAy">--</div></div>
-            <div class="mini"><div class="k">Z</div><div class="v" id="vAz">--</div></div>
-          </div>
+      </div>
+
+      <div class="section-title">Real-time Signals</div>
+      <div class="graphs">
+        <div class="graph-box">
+          <h3>ECG Signal (Lead I)</h3>
+          <div class="canvas-wrap"><canvas id="ecgChart"></canvas></div>
         </div>
-        <div class="card">
-          <div class="label">Gyroscope (°/s)</div>
-          <div class="mini-row">
-            <div class="mini"><div class="k">X</div><div class="v" id="vGx">--</div></div>
-            <div class="mini"><div class="k">Y</div><div class="v" id="vGy">--</div></div>
-            <div class="mini"><div class="k">Z</div><div class="v" id="vGz">--</div></div>
-          </div>
+        <div class="graph-box">
+          <h3>MPU6050 · Accelerometer (g)</h3>
+          <div class="canvas-wrap"><canvas id="accelChart"></canvas></div>
         </div>
-        <div class="card">
-          <div class="label">MPU Temp</div>
-          <div class="value" id="vMpu">--<small>°C</small></div>
-          <div class="sub">on-chip</div>
+        <div class="graph-box">
+          <h3>MPU6050 · Gyroscope (°/s)</h3>
+          <div class="canvas-wrap"><canvas id="gyroChart"></canvas></div>
         </div>
       </div>
     </div>
 
+    <!-- RIGHT: Risk Panel -->
     <aside class="risk-panel">
       <div class="risk-header">
         <h2>10-Year Risk Prediction</h2>
@@ -326,8 +331,7 @@
         <button class="btn" id="calcBtn">Run Prediction</button>
 
         <div class="model-info">
-          Model: <b>Logistic Regression</b> · Trained on UCI Cleveland heart disease data
-          (303 samples, 13 features). Coefficients embedded in-page.
+          Model: <b>Logistic Regression</b> · Trained on UCI Cleveland heart disease data.
           Accuracy ≈ <b>85%</b> on held-out data.
         </div>
 
@@ -378,24 +382,58 @@ const tone = (id, t) => {
   if (t) el.classList.add(t);
 };
 
-/* ---------- LOGISTIC REGRESSION MODEL ---------- */
+/* ---------- CHARTS SETUP ---------- */
+const MAX_POINTS = 60; // Show last 60 data points
+
+function makeChart(ctx, label, color, yMin, yMax) {
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Array(MAX_POINTS).fill(''),
+      datasets: [{
+        label: label,
+        data: Array(MAX_POINTS).fill(null),
+        borderColor: color,
+        backgroundColor: color + '20', // 12% opacity
+        borderWidth: 2,
+        tension: 0.3,
+        pointRadius: 0,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: { 
+          min: yMin, max: yMax,
+          grid: { color: '#1e2a44' },
+          ticks: { color: '#7f8ca6', font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+const ecgChart = makeChart($('ecgChart').getContext('2d'), 'ECG', '#22c55e', 0, 4095);
+const accelChart = makeChart($('accelChart').getContext('2d'), 'Accel', '#4f8ef7', -2, 2);
+const gyroChart = makeChart($('gyroChart').getContext('2d'), 'Gyro', '#8b5cf6', -250, 250);
+
+function pushChartData(chart, val) {
+  chart.data.datasets[0].data.push(val);
+  chart.data.datasets[0].data.shift();
+  chart.update('none');
+}
+
+/* ---------- LOGISTIC REGRESSION ---------- */
 const LR = {
   intercept: -6.78,
-  weights: {
-    age: 0.048,
-    sex: 0.85,
-    cp: -0.52,
-    trestbps: 0.021,
-    chol: 0.008,
-    fbs: 0.31,
-    thalach: -0.023,
-    exang: 0.72,
-    oldpeak: 0.48
-  }
+  weights: { age: 0.048, sex: 0.85, cp: -0.52, trestbps: 0.021, chol: 0.008, fbs: 0.31, thalach: -0.023, exang: 0.72, oldpeak: 0.48 }
 };
-
-function sigmoid(z) { return 1 / (1 + Math.exp(-z)); }
-
+const sigmoid = (z) => 1 / (1 + Math.exp(-z));
 function predictRisk(p) {
   let z = LR.intercept;
   z += LR.weights.age      * (p.age / 10);
@@ -410,131 +448,93 @@ function predictRisk(p) {
   return sigmoid(z);
 }
 
-/* ---------- RENDER RISK ---------- */
 function renderRisk(prob) {
   const pct = Math.round(prob * 100);
   const circumference = 2 * Math.PI * 72;
-  const offset = circumference * (1 - prob);
-  $("ring").style.strokeDashoffset = offset;
+  $("ring").style.strokeDashoffset = circumference * (1 - prob);
   $("riskNum").innerHTML = pct + "<small>%</small>";
   $("probFill").style.width = pct + "%";
 
   let cls, color, recs;
   if (prob < 0.20) {
     cls = "LOW RISK"; color = "var(--ok)";
-    recs = [
-      ["✓", "Maintain current lifestyle and annual check-ups."],
-      ["✓", "Continue regular aerobic exercise (150 min/week)."]
-    ];
+    recs = [["✓", "Maintain current lifestyle and annual check-ups."], ["✓", "Continue regular aerobic exercise."]];
   } else if (prob < 0.50) {
     cls = "MODERATE RISK"; color = "var(--warn)";
-    recs = [
-      ["⚠", "Schedule a lipid panel and BP review with your doctor."],
-      ["⚠", "Increase physical activity; reduce sodium and saturated fat."],
-      ["⚠", "Monitor BP and fasting glucose every 3–6 months."]
-    ];
+    recs = [["⚠", "Schedule a lipid panel and BP review."], ["⚠", "Increase physical activity; reduce sodium."]];
   } else {
     cls = "HIGH RISK"; color = "var(--bad)";
-    recs = [
-      ["!", "Consult a cardiologist promptly for full evaluation."],
-      ["!", "Discuss statin therapy and BP management with your physician."],
-      ["!", "Avoid smoking, limit alcohol, and follow a heart-healthy diet."]
-    ];
+    recs = [["!", "Consult a cardiologist promptly."], ["!", "Discuss statin therapy with your physician."]];
   }
   $("riskClass").textContent = cls;
   $("riskClass").style.color = color;
-
   $("recs").innerHTML = recs.map(([i, t]) =>
     `<div class="rec"><span class="ico" style="color:${color}">${i}</span><span>${t}</span></div>`
   ).join("");
 }
 
-/* ---------- LIVE VITALS ---------- */
-let latest = { bpm: 0, spo2: 0, bodyTemp: 0, ecg: 0, leadOff: 1, fsrForce: 0, fsrRaw: 0, finger: 0 };
-
+/* ---------- LIVE DATA & INVERSE FSR ---------- */
 onValue(dataRef, (snap) => {
   const d = snap.val();
   $("dot").classList.add("online");
   $("statusText").textContent = "Live";
-  if (!d) { $("statusText").textContent = "No data at /device1"; return; }
+  if (!d) return;
 
-  latest = {
-    bpm: Number(d.bpm) || 0,
-    spo2: Number(d.spo2) || 0,
-    bodyTemp: Number(d.bodyTemp) || 0,
-    ecg: Number(d.ecg) || 0,
-    leadOff: Number(d.leadOff) || 0,
-    fsrForce: Number(d.fsrForce) || 0,
-    fsrRaw: Number(d.fsrRaw) || 0,
-    finger: Number(d.finger) || 0
-  };
+  const finger = Number(d.finger) === 1;
+  const leadOff = Number(d.leadOff) === 1;
 
-  $("vBpm").innerHTML = fmt(latest.bpm, 0, "bpm");
-  if (latest.finger && latest.bpm > 0) {
-    $("sBpm").innerHTML = `<span class="pill ok">NORMAL</span>`;
-    tone("cBpm", "ok");
-  } else { $("sBpm").textContent = latest.finger ? "reading…" : "no finger"; tone("cBpm", "warn"); }
+  // 1. Update Text
+  $("vBpm").innerHTML = fmt(d.bpm, 0, "bpm");
+  if (finger && d.bpm > 0) { $("sBpm").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBpm","ok"); }
+  else { $("sBpm").textContent = finger ? "reading…" : "no finger"; tone("cBpm","warn"); }
 
-  $("vSpo2").innerHTML = fmt(latest.spo2, 0, "%");
-  if (latest.finger && latest.spo2 >= 95) { $("sSpo2").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cSpo2","ok"); }
-  else if (latest.finger && latest.spo2 >= 90) { $("sSpo2").innerHTML = `<span class="pill warn">LOW</span>`; tone("cSpo2","warn"); }
-  else if (latest.finger) { $("sSpo2").innerHTML = `<span class="pill bad">CRITICAL</span>`; tone("cSpo2","bad"); }
+  $("vSpo2").innerHTML = fmt(d.spo2, 0, "%");
+  if (finger && d.spo2 >= 95) { $("sSpo2").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cSpo2","ok"); }
+  else if (finger) { $("sSpo2").innerHTML = `<span class="pill warn">LOW</span>`; tone("cSpo2","warn"); }
   else { $("sSpo2").textContent = "no finger"; tone("cSpo2","warn"); }
 
-  $("vBody").innerHTML = fmt(latest.bodyTemp, 1, "°C");
-  if (latest.bodyTemp >= 36.1 && latest.bodyTemp <= 37.5) { $("sBody").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBody","ok"); }
-  else if (latest.bodyTemp > 37.5 && latest.bodyTemp < 39) { $("sBody").innerHTML = `<span class="pill warn">ELEVATED</span>`; tone("cBody","warn"); }
-  else if (latest.bodyTemp >= 39) { $("sBody").innerHTML = `<span class="pill bad">FEVER</span>`; tone("cBody","bad"); }
+  $("vBody").innerHTML = fmt(d.bodyTemp, 1, "°C");
+  if (d.bodyTemp >= 36.1 && d.bodyTemp <= 37.5) { $("sBody").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBody","ok"); }
+  else if (d.bodyTemp >= 39) { $("sBody").innerHTML = `<span class="pill bad">FEVER</span>`; tone("cBody","bad"); }
   else { $("sBody").textContent = "DS18B20"; tone("cBody", null); }
 
-  $("vEcg").textContent = latest.ecg;
-  if (latest.leadOff) { $("sEcg").innerHTML = `<span class="pill bad">LEAD OFF</span>`; tone("cEcg","bad"); }
-  else { $("sEcg").innerHTML = `<span class="pill ok">CONNECTED</span>`; tone("cEcg","ok"); }
+  // INVERSE FSR LOGIC
+  // Assuming ESP32 sends raw ADC (0-4095). 
+  // When sensor is pressed, raw drops toward 0 (inverse pull-up logic).
+  // We will invert the value so 4095->0g, and 0->9999g (or use the inverted value directly).
+  const rawFsr = Number(d.fsrRaw) || 0;
+  const invertedForce = 4095 - rawFsr; 
+  
+  // Display the inverse reading
+  $("vFsr").innerHTML = fmt(invertedForce, 0, "");
+  $("sFsr").textContent = "inv raw: " + invertedForce;
+  tone("cFsr", invertedForce > 0 ? "ok" : null);
 
-  $("vFsr").innerHTML = fmt(latest.fsrForce, 0, "g");
-  $("sFsr").textContent = "raw: " + latest.fsrRaw;
-  tone("cFsr", latest.fsrForce > 0 ? "ok" : null);
+  $("vFinger").innerHTML = finger ? `<span class="pill ok">DETECTED</span>` : `<span class="pill bad">NOT DETECTED</span>`;
+  tone("cFinger", finger ? "ok" : "bad");
 
-  $("vFinger").innerHTML = latest.finger
-    ? `<span class="pill ok">DETECTED</span>`
-    : `<span class="pill bad">NOT DETECTED</span>`;
-  tone("cFinger", latest.finger ? "ok" : "bad");
-
-  $("vAx").textContent = fmt(d.accelX, 2);
-  $("vAy").textContent = fmt(d.accelY, 2);
-  $("vAz").textContent = fmt(d.accelZ, 2);
-  $("vGx").textContent = fmt(d.gyroX, 1);
-  $("vGy").textContent = fmt(d.gyroY, 1);
-  $("vGz").textContent = fmt(d.gyroZ, 1);
-  $("vMpu").innerHTML = fmt(d.mpuTemp, 1, "°C");
+  // 2. Update Graphs
+  if (d.ecg !== undefined) pushChartData(ecgChart, Number(d.ecg));
+  if (d.accelX !== undefined) pushChartData(accelChart, Number(d.accelX));
+  if (d.gyroX !== undefined) pushChartData(gyroChart, Number(d.gyroX));
 
   $("lastUpdate").textContent = "updated " + new Date().toLocaleTimeString();
 
-  if (latest.finger && latest.bpm > 0) {
-    $("fHr").value = Math.min(220, Math.max(60, latest.bpm));
-  }
+  if (finger && d.bpm > 0) $("fHr").value = Math.min(220, Math.max(60, d.bpm));
 }, (err) => {
   $("dot").classList.remove("online");
   $("statusText").textContent = "Firebase error";
   const b = $("errBox"); b.style.display = "block";
-  b.textContent = "Firebase read error: " + err.message + " — check rules allow public read on /device1";
+  b.textContent = "Firebase read error: " + err.message;
 });
 
-/* ---------- PREDICTION BUTTON ---------- */
 $("calcBtn").addEventListener("click", () => {
   const p = {
-    age: Number($("fAge").value),
-    sex: Number($("fSex").value),
-    cp: Number($("fCp").value),
-    bp: Number($("fBp").value),
-    chol: Number($("fChol").value),
-    fbs: Number($("fFbs").value),
-    hr: Number($("fHr").value),
-    exang: Number($("fExang").value),
-    oldpeak: Number($("fOldpeak").value)
+    age: Number($("fAge").value), sex: Number($("fSex").value), cp: Number($("fCp").value),
+    bp: Number($("fBp").value), chol: Number($("fChol").value), fbs: Number($("fFbs").value),
+    hr: Number($("fHr").value), exang: Number($("fExang").value), oldpeak: Number($("fOldpeak").value)
   };
-  const prob = predictRisk(p);
-  renderRisk(prob);
+  renderRisk(predictRisk(p));
 });
 
 $("calcBtn").click();
