@@ -61,36 +61,6 @@
     color: var(--muted); margin-bottom: 12px; font-weight: 600;
   }
 
-  /* Vitals Cards */
-  .vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
-  .card {
-    background: linear-gradient(160deg, var(--surface), var(--surface2));
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px 18px; position: relative; overflow: hidden;
-    transition: border-color 0.3s;
-  }
-  .card::after {
-    content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
-    background: var(--accent); opacity: 0.6;
-  }
-  .card.ok::after { background: var(--ok); }
-  .card.warn::after { background: var(--warn); }
-  .card.bad::after { background: var(--bad); }
-  .card .label {
-    font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px;
-    color: var(--muted); margin-bottom: 7px; font-weight: 600;
-  }
-  .card .value { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-  .card .value small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 3px; }
-  .card .sub { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
-  .pill {
-    display: inline-block; padding: 2px 9px; border-radius: 999px;
-    font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px;
-  }
-  .pill.ok { background: rgba(34,197,94,0.15); color: #4ade80; }
-  .pill.warn { background: rgba(245,158,11,0.15); color: #fbbf24; }
-  .pill.bad { background: rgba(239,68,68,0.15); color: #f87171; }
-
   /* Graphs */
   .graphs { display: grid; grid-template-columns: 1fr; gap: 20px; }
   .graph-box {
@@ -98,7 +68,7 @@
     border-radius: var(--radius); padding: 16px;
   }
   .graph-box h3 { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-  .canvas-wrap { position: relative; height: 160px; width: 100%; }
+  .canvas-wrap { position: relative; height: 200px; width: 100%; }
 
   /* Table */
   .table-container {
@@ -201,36 +171,7 @@
   <div class="layout">
     <!-- LEFT -->
     <div>
-      <div class="section-title">Live Vitals (Sensors)</div>
-      <div class="vitals">
-        <div class="card" id="cBpm">
-          <div class="label">Heart Rate</div>
-          <div class="value" id="vBpm">--<small>bpm</small></div>
-          <div class="sub" id="sBpm">waiting…</div>
-        </div>
-        <div class="card" id="cSpo2">
-          <div class="label">SpO₂</div>
-          <div class="value" id="vSpo2">--<small>%</small></div>
-          <div class="sub" id="sSpo2">waiting…</div>
-        </div>
-        <div class="card" id="cBody">
-          <div class="label">Body Temp</div>
-          <div class="value" id="vBody">--<small>°C</small></div>
-          <div class="sub" id="sBody">DS18B20</div>
-        </div>
-        <div class="card" id="cFsr">
-          <div class="label">Pressure (FSR)</div>
-          <div class="value" id="vFsr">--</div>
-          <div class="sub" id="sFsr">raw: --</div>
-        </div>
-        <div class="card" id="cFinger">
-          <div class="label">Finger</div>
-          <div class="value" id="vFinger" style="font-size:20px;">--</div>
-          <div class="sub" id="sFinger">MAX30100</div>
-        </div>
-      </div>
-
-      <div class="section-title">Real-time Signals</div>
+      <div class="section-title">Live Signals (Sensors)</div>
       <div class="graphs">
         <div class="graph-box">
           <h3>ECG Signal (Lead I)</h3>
@@ -417,16 +358,6 @@ const dataRef = ref(db, "device1");
 
 /* ---------- HELPERS ---------- */
 const $ = (id) => document.getElementById(id);
-const fmt = (v, d = 0, u = "") => {
-  if (v === undefined || v === null || isNaN(v)) return "--";
-  const n = Number(v);
-  return (d > 0 ? n.toFixed(d) : Math.round(n)) + (u ? `<small>${u}</small>` : "");
-};
-const tone = (id, t) => {
-  const el = $(id);
-  el.classList.remove("ok", "warn", "bad");
-  if (t) el.classList.add(t);
-};
 
 /* ---------- CHARTS SETUP ---------- */
 const MAX_POINTS = 60;
@@ -505,44 +436,20 @@ function renderRisk(prob) {
   currentRisk = { prob, cls, recs };
 }
 
-/* ---------- LIVE DATA & INVERSE FSR ---------- */
+/* ---------- LIVE DATA & CHARTS (Background) ---------- */
 onValue(dataRef, (snap) => {
   const d = snap.val();
   $("dot").classList.add("online");
   $("statusText").textContent = "Live";
   if (!d) return;
 
-  const finger = Number(d.finger) === 1;
   const rawFsr = Number(d.fsrRaw) || 0;
-  const invertedForce = 4095 - rawFsr; 
-
   latestVitals = {
     bpm: Number(d.bpm) || 0, spo2: Number(d.spo2) || 0, bodyTemp: Number(d.bodyTemp) || 0,
-    ecg: Number(d.ecg) || 0, fsr: invertedForce, finger: finger,
+    ecg: Number(d.ecg) || 0, fsr: 4095 - rawFsr, finger: Number(d.finger)||0,
     accelX: Number(d.accelX)||0, accelY: Number(d.accelY)||0, accelZ: Number(d.accelZ)||0,
     gyroX: Number(d.gyroX)||0, gyroY: Number(d.gyroY)||0, gyroZ: Number(d.gyroZ)||0
   };
-
-  $("vBpm").innerHTML = fmt(latestVitals.bpm, 0, "bpm");
-  if (finger && latestVitals.bpm > 0) { $("sBpm").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBpm","ok"); }
-  else { $("sBpm").textContent = finger ? "reading…" : "no finger"; tone("cBpm","warn"); }
-
-  $("vSpo2").innerHTML = fmt(latestVitals.spo2, 0, "%");
-  if (finger && latestVitals.spo2 >= 95) { $("sSpo2").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cSpo2","ok"); }
-  else if (finger) { $("sSpo2").innerHTML = `<span class="pill warn">LOW</span>`; tone("cSpo2","warn"); }
-  else { $("sSpo2").textContent = "no finger"; tone("cSpo2","warn"); }
-
-  $("vBody").innerHTML = fmt(latestVitals.bodyTemp, 1, "°C");
-  if (latestVitals.bodyTemp >= 36.1 && latestVitals.bodyTemp <= 37.5) { $("sBody").innerHTML = `<span class="pill ok">NORMAL</span>`; tone("cBody","ok"); }
-  else if (latestVitals.bodyTemp >= 39) { $("sBody").innerHTML = `<span class="pill bad">FEVER</span>`; tone("cBody","bad"); }
-  else { $("sBody").textContent = "DS18B20"; tone("cBody", null); }
-
-  $("vFsr").innerHTML = fmt(invertedForce, 0, "");
-  $("sFsr").textContent = "inv raw: " + invertedForce;
-  tone("cFsr", invertedForce > 0 ? "ok" : null);
-
-  $("vFinger").innerHTML = finger ? `<span class="pill ok">DETECTED</span>` : `<span class="pill bad">NOT DETECTED</span>`;
-  tone("cFinger", finger ? "ok" : "bad");
 
   if (d.ecg !== undefined) pushChartData(ecgChart, Number(d.ecg));
   if (d.accelX !== undefined) pushChartData(accelChart, Number(d.accelX));
