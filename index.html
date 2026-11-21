@@ -201,7 +201,7 @@
   <div class="layout">
     <!-- LEFT -->
     <div>
-      <div class="section-title">Live Vitals</div>
+      <div class="section-title">Live Vitals (Sensors)</div>
       <div class="vitals">
         <div class="card" id="cBpm">
           <div class="label">Heart Rate</div>
@@ -451,7 +451,6 @@ function pushChartData(chart, val) {
 }
 
 /* ---------- LOGISTIC REGRESSION ---------- */
-// Updated weights to handle 'slope' instead of the missing restecg.
 const LR = { 
   intercept: -6.78, 
   weights: { 
@@ -474,7 +473,7 @@ function predictRisk(p) {
   z += LR.weights.exang    * p.exang;
   z += LR.weights.oldpeak  * p.oldpeak;
   z += LR.weights.weight   * ((p.weight - 70) / 10);
-  z += LR.weights.slope    * (p.slope === 2 ? 1 : (p.slope === 1 ? 0.3 : -0.2)); // 2=Down, 1=Flat, 0=Up
+  z += LR.weights.slope    * (p.slope === 2 ? 1 : (p.slope === 1 ? 0.3 : -0.2)); 
   return sigmoid(z);
 }
 
@@ -562,12 +561,23 @@ let predictionHistory = [];
 
 $("calcBtn").addEventListener("click", () => {
   const name = $("fName").value.trim() || "Unknown Patient";
+  
+  // MANUAL INPUT VALUES
   const p = {
-    age: Number($("fAge").value), sex: Number($("fSex").value), cp: Number($("fCp").value),
-    bp: Number($("fBp").value), chol: Number($("fChol").value), fbs: Number($("fFbs").value),
-    hr: Number($("fHr").value), exang: Number($("fExang").value), oldpeak: Number($("fOldpeak").value),
-    spo2: Number($("fSpo2").value), weight: Number($("fWeight").value), slope: Number($("fSlope").value)
+    age: Number($("fAge").value), 
+    sex: Number($("fSex").value), 
+    cp: Number($("fCp").value),
+    bp: Number($("fBp").value), 
+    chol: Number($("fChol").value), 
+    fbs: Number($("fFbs").value),
+    hr: Number($("fHr").value), 
+    exang: Number($("fExang").value), 
+    oldpeak: Number($("fOldpeak").value),
+    spo2: Number($("fSpo2").value), 
+    weight: Number($("fWeight").value), 
+    slope: Number($("fSlope").value)
   };
+  
   const prob = predictRisk(p);
   renderRisk(prob);
 
@@ -580,12 +590,11 @@ $("calcBtn").addEventListener("click", () => {
     cls: currentRisk.cls,
     recs: currentRisk.recs,
     inputs: p,
-    vitals: latestVitals
+    vitals: latestVitals // Still capture the live background sensors for the report
   };
   predictionHistory.unshift(record);
   updateTable();
 
-  // Trigger the download immediately after the UI updates
   setTimeout(() => {
     generateAndDownloadReport(record);
   }, 500); 
@@ -638,17 +647,17 @@ function generateAndDownloadReport(data) {
   data.recs.forEach(r => { text += `  - ${r[1]}\n`; });
   text += "\n";
 
-  text += "--- CLINICAL PARAMETERS (INPUT) ---\n";
+  text += "--- CLINICAL PARAMETERS (MANUAL INPUT) ---\n";
   text += `Age: ${data.inputs.age} yrs | Sex: ${data.inputs.sex === 1 ? 'Male' : 'Female'}\n`;
   text += `Heart Rate: ${data.inputs.hr} bpm | SpO2: ${data.inputs.spo2} %\n`;
   text += `Body Weight: ${data.inputs.weight} kg | Resting BP: ${data.inputs.bp} mmHg\n`;
   text += `Cholesterol: ${data.inputs.chol} mg/dL | ECG LA (Slope): ${['Upsloping','Flat','Downsloping'][data.inputs.slope]}\n`;
-  text += `Max HR: ${data.inputs.hr} bpm | ST Depression: ${data.inputs.oldpeak}\n`;
+  text += `ST Depression: ${data.inputs.oldpeak}\n`;
   text += `Chest Pain: ${['Typical Angina','Atypical Angina','Non-Anginal','Asymptomatic'][data.inputs.cp]}\n`;
   text += `Fasting Blood Sugar > 120: ${data.inputs.fbs === 1 ? 'Yes' : 'No'}\n`;
   text += `Exercise Angina: ${data.inputs.exang === 1 ? 'Yes' : 'No'}\n\n`;
 
-  text += "--- LIVE SENSOR VITALS (AT TIME OF TEST) ---\n";
+  text += "--- LIVE SENSOR DATA (BACKGROUND) ---\n";
   text += `Body Temp (DS18B20)  : ${data.vitals.bodyTemp} °C\n`;
   text += `ECG Raw Value (AD8232): ${data.vitals.ecg}\n`;
   text += `Pressure (FSR)       : ${data.vitals.fsr} (inverted)\n\n`;
