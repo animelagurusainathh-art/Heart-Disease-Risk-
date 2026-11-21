@@ -176,7 +176,6 @@
     color: #fca5a5; font-size: 12.5px; display: none;
   }
 
-  .disclaimer { margin: 30px 0 0; padding: 12px 16px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; font-size: 11px; color: #d4b06a; text-align: center; }
   footer { margin: 20px 0 0; font-size: 11px; color: var(--muted); text-align: center; }
 </style>
 </head>
@@ -299,21 +298,45 @@
             <select id="fSex"><option value="1">Male</option><option value="0">Female</option></select>
           </div>
         </div>
+
         <div class="field-row">
+          <div class="field">
+            <label>Heart Rate (bpm)</label>
+            <input type="number" id="fHr" value="75" min="40" max="220" />
+          </div>
+          <div class="field">
+            <label>SpO2 (%)</label>
+            <input type="number" id="fSpo2" value="98" min="50" max="100" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Body Weight (kg)</label>
+            <input type="number" id="fWeight" value="70" min="30" max="200" />
+          </div>
           <div class="field">
             <label>Resting BP (mmHg)</label>
             <input type="number" id="fBp" value="130" min="80" max="220" />
           </div>
+        </div>
+
+        <div class="field-row">
           <div class="field">
             <label>Cholesterol (mg/dL)</label>
             <input type="number" id="fChol" value="220" min="100" max="600" />
           </div>
-        </div>
-        <div class="field-row">
           <div class="field">
-            <label>Max Heart Rate</label>
-            <input type="number" id="fHr" value="150" min="60" max="220" />
+            <label>ECG LA (Slope)</label>
+            <select id="fSlope">
+              <option value="0">Upsloping</option>
+              <option value="1" selected>Flat</option>
+              <option value="2">Downsloping</option>
+            </select>
           </div>
+        </div>
+
+        <div class="field-row">
           <div class="field">
             <label>Chest Pain Type</label>
             <select id="fCp">
@@ -323,10 +346,15 @@
               <option value="3" selected>Asymptomatic</option>
             </select>
           </div>
+          <div class="field">
+            <label>ST Depression (oldpeak)</label>
+            <input type="number" id="fOldpeak" value="1.0" step="0.1" min="0" max="6" />
+          </div>
         </div>
+
         <div class="field-row">
           <div class="field">
-            <label>Fasting Blood Sugar &gt; 120 mg/dL</label>
+            <label>Fasting Blood Sugar &gt; 120</label>
             <select id="fFbs"><option value="0">No</option><option value="1">Yes</option></select>
           </div>
           <div class="field">
@@ -334,10 +362,7 @@
             <select id="fExang"><option value="0">No</option><option value="1">Yes</option></select>
           </div>
         </div>
-        <div class="field">
-          <label>ST Depression (oldpeak)</label>
-          <input type="number" id="fOldpeak" value="1.0" step="0.1" min="0" max="6" />
-        </div>
+        
         <button class="btn-main" id="calcBtn">Run Prediction & Download</button>
 
         <div class="recs" id="recs"></div>
@@ -363,10 +388,6 @@
         </tr>
       </tbody>
     </table>
-  </div>
-
-  <div class="disclaimer">
-    ⚠️ This tool is for educational and research purposes only. It is not a medical device and must not be used for clinical diagnosis or treatment decisions. Always consult a qualified healthcare professional.
   </div>
 
   <footer>
@@ -430,8 +451,17 @@ function pushChartData(chart, val) {
 }
 
 /* ---------- LOGISTIC REGRESSION ---------- */
-const LR = { intercept: -6.78, weights: { age: 0.048, sex: 0.85, cp: -0.52, trestbps: 0.021, chol: 0.008, fbs: 0.31, thalach: -0.023, exang: 0.72, oldpeak: 0.48 } };
+// Updated weights to handle 'slope' instead of the missing restecg.
+const LR = { 
+  intercept: -6.78, 
+  weights: { 
+    age: 0.048, sex: 0.85, cp: -0.52, trestbps: 0.021, 
+    chol: 0.008, fbs: 0.31, thalach: -0.023, exang: 0.72, 
+    oldpeak: 0.48, weight: 0.01, slope: 0.35 
+  } 
+};
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
+
 function predictRisk(p) {
   let z = LR.intercept;
   z += LR.weights.age      * (p.age / 10);
@@ -443,6 +473,8 @@ function predictRisk(p) {
   z += LR.weights.thalach  * ((p.hr - 150) / 20);
   z += LR.weights.exang    * p.exang;
   z += LR.weights.oldpeak  * p.oldpeak;
+  z += LR.weights.weight   * ((p.weight - 70) / 10);
+  z += LR.weights.slope    * (p.slope === 2 ? 1 : (p.slope === 1 ? 0.3 : -0.2)); // 2=Down, 1=Flat, 0=Up
   return sigmoid(z);
 }
 
@@ -518,7 +550,6 @@ onValue(dataRef, (snap) => {
   if (d.gyroX !== undefined) pushChartData(gyroChart, Number(d.gyroX));
 
   $("lastUpdate").textContent = "updated " + new Date().toLocaleTimeString();
-  if (finger && latestVitals.bpm > 0) $("fHr").value = Math.min(220, Math.max(60, latestVitals.bpm));
 }, (err) => {
   $("dot").classList.remove("online");
   $("statusText").textContent = "Firebase error";
@@ -534,7 +565,8 @@ $("calcBtn").addEventListener("click", () => {
   const p = {
     age: Number($("fAge").value), sex: Number($("fSex").value), cp: Number($("fCp").value),
     bp: Number($("fBp").value), chol: Number($("fChol").value), fbs: Number($("fFbs").value),
-    hr: Number($("fHr").value), exang: Number($("fExang").value), oldpeak: Number($("fOldpeak").value)
+    hr: Number($("fHr").value), exang: Number($("fExang").value), oldpeak: Number($("fOldpeak").value),
+    spo2: Number($("fSpo2").value), weight: Number($("fWeight").value), slope: Number($("fSlope").value)
   };
   const prob = predictRisk(p);
   renderRisk(prob);
@@ -579,7 +611,6 @@ function updateTable() {
     `;
   }).join("");
 
-  // Attach event listeners to newly created buttons
   document.querySelectorAll('.btn-download').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = Number(e.target.getAttribute('data-id'));
@@ -609,28 +640,22 @@ function generateAndDownloadReport(data) {
 
   text += "--- CLINICAL PARAMETERS (INPUT) ---\n";
   text += `Age: ${data.inputs.age} yrs | Sex: ${data.inputs.sex === 1 ? 'Male' : 'Female'}\n`;
-  text += `Resting BP: ${data.inputs.bp} mmHg | Cholesterol: ${data.inputs.chol} mg/dL\n`;
-  text += `Max Heart Rate: ${data.inputs.hr} bpm | ST Depression: ${data.inputs.oldpeak}\n`;
-  text += `Chest Pain Type: ${['Typical Angina','Atypical Angina','Non-Anginal','Asymptomatic'][data.inputs.cp]}\n`;
+  text += `Heart Rate: ${data.inputs.hr} bpm | SpO2: ${data.inputs.spo2} %\n`;
+  text += `Body Weight: ${data.inputs.weight} kg | Resting BP: ${data.inputs.bp} mmHg\n`;
+  text += `Cholesterol: ${data.inputs.chol} mg/dL | ECG LA (Slope): ${['Upsloping','Flat','Downsloping'][data.inputs.slope]}\n`;
+  text += `Max HR: ${data.inputs.hr} bpm | ST Depression: ${data.inputs.oldpeak}\n`;
+  text += `Chest Pain: ${['Typical Angina','Atypical Angina','Non-Anginal','Asymptomatic'][data.inputs.cp]}\n`;
   text += `Fasting Blood Sugar > 120: ${data.inputs.fbs === 1 ? 'Yes' : 'No'}\n`;
   text += `Exercise Angina: ${data.inputs.exang === 1 ? 'Yes' : 'No'}\n\n`;
 
   text += "--- LIVE SENSOR VITALS (AT TIME OF TEST) ---\n";
-  text += `Heart Rate (MAX30100): ${data.vitals.bpm} bpm\n`;
-  text += `SpO2 (MAX30100)      : ${data.vitals.spo2} %\n`;
   text += `Body Temp (DS18B20)  : ${data.vitals.bodyTemp} °C\n`;
-  text += `ECG Value (AD8232)   : ${data.vitals.ecg}\n`;
+  text += `ECG Raw Value (AD8232): ${data.vitals.ecg}\n`;
   text += `Pressure (FSR)       : ${data.vitals.fsr} (inverted)\n\n`;
 
   text += "--- MOTION DATA (MPU6050) ---\n";
   text += `Accelerometer: X: ${data.vitals.accelX}g, Y: ${data.vitals.accelY}g, Z: ${data.vitals.accelZ}g\n`;
-  text += `Gyroscope    : X: ${data.vitals.gyroX}°/s, Y: ${data.vitals.gyroY}°/s, Z: ${data.vitals.gyroZ}°/s\n\n`;
-
-  text += border;
-  text += "DISCLAIMER: This tool is for educational and research purposes\n";
-  text += "only. It is not a medical device and must not be used for\n";
-  text += "clinical diagnosis. Always consult a qualified healthcare professional.\n";
-  text += border;
+  text += `Gyroscope    : X: ${data.vitals.gyroX}°/s, Y: ${data.vitals.gyroY}°/s, Z: ${data.vitals.gyroZ}°/s\n`;
 
   const blob = new Blob([text], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
