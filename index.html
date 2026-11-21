@@ -61,6 +61,34 @@
     color: var(--muted); margin-bottom: 12px; font-weight: 600;
   }
 
+  /* Vitals Cards */
+  .vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card {
+    background: linear-gradient(160deg, var(--surface), var(--surface2));
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; position: relative; overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .card::after {
+    content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+    background: var(--accent); opacity: 0.6;
+  }
+  .card.ok::after { background: var(--ok); }
+  .card.warn::after { background: var(--warn); }
+  .card.bad::after { background: var(--bad); }
+  .card .label {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 7px; font-weight: 600;
+  }
+  .card .value { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .card .value small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+  .card .sub { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
+  
+  .mini-row { display: flex; gap: 8px; margin-top: 4px; }
+  .mini { flex: 1; background: var(--surface2); border-radius: 9px; padding: 7px 9px; }
+  .mini .k { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  .mini .v { font-size: 15px; font-weight: 600; }
+
   /* Graphs */
   .graphs { display: grid; grid-template-columns: 1fr; gap: 20px; }
   .graph-box {
@@ -68,7 +96,7 @@
     border-radius: var(--radius); padding: 16px;
   }
   .graph-box h3 { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-  .canvas-wrap { position: relative; height: 200px; width: 100%; }
+  .canvas-wrap { position: relative; height: 160px; width: 100%; }
 
   /* Table */
   .table-container {
@@ -171,7 +199,39 @@
   <div class="layout">
     <!-- LEFT -->
     <div>
-      <div class="section-title">Live Signals (Sensors)</div>
+      <div class="section-title">Live Sensor Data</div>
+      <div class="vitals">
+        <div class="card" id="cBody">
+          <div class="label">Body Temp</div>
+          <div class="value" id="vBody">--<small>°C</small></div>
+          <div class="sub" id="sBody">DS18B20</div>
+        </div>
+        <div class="card" id="cFsr">
+          <div class="label">Pressure (FSR)</div>
+          <div class="value" id="vFsr">--</div>
+          <div class="sub" id="sFsr">inv raw: --</div>
+        </div>
+        <div class="card">
+          <div class="label">Accelerometer (g)</div>
+          <div class="mini-row">
+            <div class="mini"><div class="k">X</div><div class="v" id="vAx">--</div></div>
+            <div class="mini"><div class="k">Y</div><div class="v" id="vAy">--</div></div>
+            <div class="mini"><div class="k">Z</div><div class="v" id="vAz">--</div></div>
+          </div>
+          <div class="sub" style="margin-top:8px;">MPU6050</div>
+        </div>
+        <div class="card">
+          <div class="label">Gyroscope (°/s)</div>
+          <div class="mini-row">
+            <div class="mini"><div class="k">X</div><div class="v" id="vGx">--</div></div>
+            <div class="mini"><div class="k">Y</div><div class="v" id="vGy">--</div></div>
+            <div class="mini"><div class="k">Z</div><div class="v" id="vGz">--</div></div>
+          </div>
+          <div class="sub" style="margin-top:8px;">MPU6050</div>
+        </div>
+      </div>
+
+      <div class="section-title">Real-time Signals</div>
       <div class="graphs">
         <div class="graph-box">
           <h3>ECG Signal (Lead I)</h3>
@@ -358,6 +418,16 @@ const dataRef = ref(db, "device1");
 
 /* ---------- HELPERS ---------- */
 const $ = (id) => document.getElementById(id);
+const fmt = (v, d = 0, u = "") => {
+  if (v === undefined || v === null || isNaN(v)) return "--";
+  const n = Number(v);
+  return (d > 0 ? n.toFixed(d) : Math.round(n)) + (u ? `<small>${u}</small>` : "");
+};
+const tone = (id, t) => {
+  const el = $(id);
+  el.classList.remove("ok", "warn", "bad");
+  if (t) el.classList.add(t);
+};
 
 /* ---------- CHARTS SETUP ---------- */
 const MAX_POINTS = 60;
@@ -436,7 +506,7 @@ function renderRisk(prob) {
   currentRisk = { prob, cls, recs };
 }
 
-/* ---------- LIVE DATA & CHARTS (Background) ---------- */
+/* ---------- LIVE DATA & CHARTS ---------- */
 onValue(dataRef, (snap) => {
   const d = snap.val();
   $("dot").classList.add("online");
@@ -444,13 +514,34 @@ onValue(dataRef, (snap) => {
   if (!d) return;
 
   const rawFsr = Number(d.fsrRaw) || 0;
+  const invertedForce = 4095 - rawFsr; 
+
   latestVitals = {
     bpm: Number(d.bpm) || 0, spo2: Number(d.spo2) || 0, bodyTemp: Number(d.bodyTemp) || 0,
-    ecg: Number(d.ecg) || 0, fsr: 4095 - rawFsr, finger: Number(d.finger)||0,
+    ecg: Number(d.ecg) || 0, fsr: invertedForce, finger: Number(d.finger)||0,
     accelX: Number(d.accelX)||0, accelY: Number(d.accelY)||0, accelZ: Number(d.accelZ)||0,
     gyroX: Number(d.gyroX)||0, gyroY: Number(d.gyroY)||0, gyroZ: Number(d.gyroZ)||0
   };
 
+  // Update Text Cards
+  $("vBody").innerHTML = fmt(latestVitals.bodyTemp, 1, "°C");
+  if (latestVitals.bodyTemp >= 36.1 && latestVitals.bodyTemp <= 37.5) { $("sBody").textContent = "NORMAL"; tone("cBody","ok"); }
+  else if (latestVitals.bodyTemp >= 39) { $("sBody").textContent = "FEVER"; tone("cBody","bad"); }
+  else { $("sBody").textContent = "DS18B20"; tone("cBody", null); }
+
+  $("vFsr").innerHTML = fmt(invertedForce, 0, "");
+  $("sFsr").textContent = "inv raw: " + invertedForce;
+  tone("cFsr", invertedForce > 0 ? "ok" : null);
+
+  $("vAx").textContent = fmt(latestVitals.accelX, 2);
+  $("vAy").textContent = fmt(latestVitals.accelY, 2);
+  $("vAz").textContent = fmt(latestVitals.accelZ, 2);
+  
+  $("vGx").textContent = fmt(latestVitals.gyroX, 1);
+  $("vGy").textContent = fmt(latestVitals.gyroY, 1);
+  $("vGz").textContent = fmt(latestVitals.gyroZ, 1);
+
+  // Update Charts
   if (d.ecg !== undefined) pushChartData(ecgChart, Number(d.ecg));
   if (d.accelX !== undefined) pushChartData(accelChart, Number(d.accelX));
   if (d.gyroX !== undefined) pushChartData(gyroChart, Number(d.gyroX));
@@ -469,7 +560,6 @@ let predictionHistory = [];
 $("calcBtn").addEventListener("click", () => {
   const name = $("fName").value.trim() || "Unknown Patient";
   
-  // MANUAL INPUT VALUES
   const p = {
     age: Number($("fAge").value), 
     sex: Number($("fSex").value), 
@@ -497,7 +587,7 @@ $("calcBtn").addEventListener("click", () => {
     cls: currentRisk.cls,
     recs: currentRisk.recs,
     inputs: p,
-    vitals: latestVitals // Still capture the live background sensors for the report
+    vitals: latestVitals 
   };
   predictionHistory.unshift(record);
   updateTable();
